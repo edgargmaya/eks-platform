@@ -1,0 +1,76 @@
+# Distroless kubectl image: no shell. Sequential initContainers replace the
+# old bash "patch if present" script. Default EKS clusters always create
+# aws-node and kube-proxy; a missing DaemonSet fails the Job on purpose.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: disable-legacy-cni
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- include "disable-legacy-cni.hookAnnotations" . | nindent 4 }}
+    helm.sh/hook-weight: "-10"
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 180
+  template:
+    spec:
+      serviceAccountName: disable-legacy-cni
+      restartPolicy: Never
+      hostNetwork: true
+      # VPC DNS. kubernetes.default.svc would not resolve; the Job talks to
+      # the EKS API FQDN via KUBERNETES_SERVICE_HOST (set below).
+      dnsPolicy: Default
+      tolerations:
+        - operator: Exists
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: patch-aws-node
+          image: {{ .Values.kubectlImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - patch
+            - daemonset
+            - aws-node
+            - --namespace={{ .Release.Namespace }}
+            - --type=strategic
+            - '--patch={"spec":{"template":{"spec":{"nodeSelector":{"io.cilium/aws-node-enabled":"true"}}}}}'
+          env:
+            {{- include "disable-legacy-cni.kubectlEnv" . | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+        - name: patch-kube-proxy
+          image: {{ .Values.kubectlImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - patch
+            - daemonset
+            - kube-proxy
+            - --namespace={{ .Release.Namespace }}
+            - --type=strategic
+            - '--patch={"spec":{"template":{"spec":{"nodeSelector":{"io.cilium/kube-proxy-enabled":"true"}}}}}'
+          env:
+            {{- include "disable-legacy-cni.kubectlEnv" . | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: complete
+          image: {{ .Values.kubectlImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - version
+            - --client
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

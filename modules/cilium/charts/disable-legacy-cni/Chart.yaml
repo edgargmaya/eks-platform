@@ -1,0 +1,9 @@
+apiVersion: v2
+name: disable-legacy-cni
+description: >
+  Park the EKS aws-node and kube-proxy DaemonSets (nodeSelector that matches
+  no nodes) so Cilium can own CNI and kube-proxy replacement. Runs as a
+  Helm pre-install/pre-upgrade hook on the worker nodes.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"

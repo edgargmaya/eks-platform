@@ -37,3 +37,25 @@ module "nodegroup" {
   min_size                           = var.node_min_size
   max_size                           = var.node_max_size
 }
+
+module "cilium_iam" {
+  source = "../modules/cilium-iam"
+
+  cluster_name           = var.cluster_name
+  oidc_provider_arn      = module.cluster.oidc_provider_arn
+  oidc_provider_hostpath = module.cluster.oidc_provider_hostpath
+}
+
+module "cilium" {
+  source = "../modules/cilium"
+
+  cluster_name      = module.cluster.cluster_name
+  cluster_endpoint  = module.cluster.cluster_endpoint
+  aws_region        = var.aws_region
+  vpc_cidr          = local.vpc_cidr
+  operator_role_arn = module.cilium_iam.operator_role_arn
+  chart_version     = var.cilium_chart_version
+  enable_hubble_ui  = var.cilium_enable_hubble_ui
+
+  depends_on = [module.nodegroup, module.cilium_iam]
+}

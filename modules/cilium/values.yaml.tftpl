@@ -1,0 +1,62 @@
+cluster:
+  name: ${cluster_name}
+
+eni:
+  enabled: true
+  awsReleaseExcessIPs: true
+  awsEnablePrefixDelegation: ${enable_prefix_delegation}
+  iamRole: ${operator_role_arn}
+  subnetTagsFilter:
+    - "kubernetes.io/role/internal-elb=1"
+  nodeSpec:
+    firstInterfaceIndex: 1
+
+ipam:
+  mode: eni
+
+routingMode: native
+ipv4NativeRoutingCIDR: ${vpc_cidr}
+egressMasqueradeInterfaces: ${masquerade_interface}
+
+endpointRoutes:
+  enabled: true
+
+bpf:
+  masquerade: false
+
+kubeProxyReplacement: true
+k8sServiceHost: ${k8s_service_host}
+k8sServicePort: "443"
+
+nodeinit:
+  enabled: true
+
+operator:
+  replicas: 1
+  rollOutPods: true
+  # CoreDNS is down until Cilium IPAM works. Default uses the node VPC resolver
+  # instead of the CoreDNS ClusterIP.
+  dnsPolicy: Default
+  extraEnv:
+    - name: AWS_REGION
+      value: ${aws_region}
+    - name: AWS_DEFAULT_REGION
+      value: ${aws_region}
+
+serviceAccounts:
+  operator:
+    name: ${operator_service_account_name}
+    annotations:
+      eks.amazonaws.com/role-arn: ${operator_role_arn}
+
+hubble:
+  enabled: ${enable_hubble}
+  relay:
+    enabled: ${enable_hubble}
+  ui:
+    enabled: ${enable_hubble_ui}
+
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: false

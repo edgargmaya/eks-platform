@@ -70,6 +70,18 @@ variable "tfstate_kms_alias" {
   type        = string
 }
 
+variable "cilium_chart_version" {
+  description = "Cilium Helm chart version."
+  type        = string
+  default     = "1.20.1"
+}
+
+variable "cilium_enable_hubble_ui" {
+  description = "Deploy Hubble UI as ClusterIP (kubectl port-forward)."
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags merged into the provider default_tags."
   type        = map(string)
@@ -77,7 +89,7 @@ variable "tags" {
     "infra:product-stream" = "cloud-engineering"
     "infra:team"           = "cloud-engineering"
     "infra:supported-by"   = "cloud-engineering"
-    Project              = "eks-platform-alesia"
-    ManagedBy            = "terraform"
+    Project                = "eks-platform-alesia"
+    ManagedBy              = "terraform"
   }
 }

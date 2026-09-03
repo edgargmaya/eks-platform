@@ -57,3 +57,18 @@ output "configure_kubectl" {
   description = "Command to write kubeconfig for this cluster."
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.cluster.cluster_name}"
 }
+
+output "cilium_operator_role_arn" {
+  description = "IRSA role ARN used by cilium-operator for ENI IPAM."
+  value       = module.cilium_iam.operator_role_arn
+}
+
+output "cilium_chart_version" {
+  description = "Installed Cilium Helm chart version."
+  value       = module.cilium.chart_version
+}
+
+output "cilium_status" {
+  description = "Cilium Helm release status."
+  value       = module.cilium.status
+}

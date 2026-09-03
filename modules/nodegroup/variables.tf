@@ -30,7 +30,7 @@ variable "node_role_arn" {
 }
 
 variable "subnet_ids" {
-  description = "Private subnet IDs for worker nodes. Use the /20 node subnets from bootstrap, not the /28 control-plane subnets."
+  description = "Private subnet IDs for worker nodes. Use the /19 node subnets from bootstrap, not the /28 control-plane subnets."
   type        = list(string)
 
   validation {

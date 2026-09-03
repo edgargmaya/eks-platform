@@ -1,0 +1,4 @@
+# Overridden by the Terraform helm_release. Defaults exist so helm template works.
+kubectlImage: registry.k8s.io/kubectl:v1.35.0
+apiServerHost: ""
+apiServerPort: "443"

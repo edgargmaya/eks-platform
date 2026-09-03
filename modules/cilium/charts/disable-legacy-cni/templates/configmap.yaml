@@ -1,0 +1,10 @@
+# Regular (non-hook) object so the Helm release is not "hooks only".
+# Terraform/Helm wait on this ConfigMap after the pre-install Job succeeds.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: disable-legacy-cni
+  namespace: {{ .Release.Namespace }}
+data:
+  aws-node: io.cilium/aws-node-enabled=true
+  kube-proxy: io.cilium/kube-proxy-enabled=true

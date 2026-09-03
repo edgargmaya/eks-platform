@@ -14,3 +14,6 @@ node_instance_types = ["t3.medium"]
 node_desired_size   = 2
 node_min_size       = 2
 node_max_size       = 6
+
+cilium_chart_version    = "1.20.1"
+cilium_enable_hubble_ui = true
