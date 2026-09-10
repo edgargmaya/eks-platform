@@ -82,6 +82,24 @@ variable "cilium_enable_hubble_ui" {
   default     = true
 }
 
+variable "lbc_chart_version" {
+  description = "AWS Load Balancer Controller Helm chart version (eks-charts)."
+  type        = string
+  default     = "3.5.0"
+}
+
+variable "keda_chart_version" {
+  description = "KEDA Helm chart version (kedacore/charts)."
+  type        = string
+  default     = "2.20.2"
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version (oci://public.ecr.aws/karpenter)."
+  type        = string
+  default     = "1.14.1"
+}
+
 variable "tags" {
   description = "Tags merged into the provider default_tags."
   type        = map(string)

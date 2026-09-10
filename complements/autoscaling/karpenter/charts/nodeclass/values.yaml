@@ -1,0 +1,5 @@
+clusterName: alesia
+instanceProfile: alesia-karpenter-nodes
+clusterSecurityGroupId: sg-placeholder
+amiAlias: al2023@latest
+cpuLimit: 32
