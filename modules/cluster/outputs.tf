@@ -40,17 +40,17 @@ output "service_ipv4_cidr" {
 }
 
 output "oidc_issuer_url" {
-  description = "OIDC issuer URL for IRSA."
+  description = "EKS OIDC issuer URL. The IAM OIDC provider in irsa.tf registers this URL so IRSA can work."
   value       = aws_eks_cluster.this.identity[0].oidc[0].issuer
 }
 
 output "oidc_provider_arn" {
-  description = "IAM OIDC provider ARN."
+  description = "IAM OIDC provider ARN. Complements use this as the IRSA trust principal."
   value       = aws_iam_openid_connect_provider.cluster.arn
 }
 
 output "oidc_provider_hostpath" {
-  description = "OIDC issuer without https://, for IAM trust conditions."
+  description = "OIDC issuer without https://. Complements use this in IAM trust conditions (:sub / :aud)."
   value       = replace(aws_eks_cluster.this.identity[0].oidc[0].issuer, "https://", "")
 }
 

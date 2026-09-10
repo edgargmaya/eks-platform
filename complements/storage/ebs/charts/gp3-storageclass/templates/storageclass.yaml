@@ -1,0 +1,18 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.name }}
+  {{- if .Values.isDefault }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  {{- end }}
+provisioner: ebs.csi.aws.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: gp3
+  encrypted: {{ .Values.encrypted | quote }}
+  {{- if .Values.kmsKeyId }}
+  kmsKeyId: {{ .Values.kmsKeyId | quote }}
+  {{- end }}

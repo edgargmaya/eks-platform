@@ -1,3 +1,13 @@
+output "operator_role_name" {
+  description = "IAM role name assumed by cilium-operator via IRSA."
+  value       = aws_iam_role.operator.name
+}
+
+output "operator_role_arn" {
+  description = "IRSA role ARN annotated on the cilium-operator service account."
+  value       = aws_iam_role.operator.arn
+}
+
 output "disable_legacy_cni_status" {
   description = "Helm release status for the aws-node/kube-proxy patch."
   value       = helm_release.disable_legacy_cni.status
@@ -19,6 +29,6 @@ output "namespace" {
 }
 
 output "status" {
-  description = "Helm release status."
+  description = "Cilium Helm release status."
   value       = helm_release.cilium.status
 }

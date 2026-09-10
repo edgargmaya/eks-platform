@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lbc-smoke
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+  namespace: lbc-smoke
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: echo
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      containers:
+        - name: echo
+          image: public.ecr.aws/nginx/nginx:1.27
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        # Tight loop so CPU utilization exceeds the ScaledObject target
+        # without depending on ALB traffic. Limit caps burn at 150m.
+        - name: cpu-stress
+          image: public.ecr.aws/docker/library/busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args: ["while true; do :; done"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 16Mi
+            limits:
+              cpu: 150m
+              memory: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo
+  namespace: lbc-smoke
+spec:
+  selector:
+    app: echo
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echo
+  namespace: lbc-smoke
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: echo
+  namespace: lbc-smoke
+spec:
+  scaleTargetRef:
+    name: echo
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+            - type: Pods
+              value: 4
+              periodSeconds: 15
+          selectPolicy: Max
+        scaleDown:
+          stabilizationWindowSeconds: 60
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "50"
+        containerName: cpu-stress

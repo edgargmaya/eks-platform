@@ -1,5 +1,5 @@
 variable "cluster_name" {
-  description = "EKS cluster name. Passed to Cilium as cluster.name."
+  description = "EKS cluster name. Used on the operator IAM role and as Cilium cluster.name."
   type        = string
 }
 
@@ -18,8 +18,13 @@ variable "vpc_cidr" {
   type        = string
 }
 
-variable "operator_role_arn" {
-  description = "IRSA role ARN for cilium-operator (from the cilium-iam module)."
+variable "oidc_provider_arn" {
+  description = "IAM OIDC provider ARN from the cluster module (IRSA trust)."
+  type        = string
+}
+
+variable "oidc_provider_hostpath" {
+  description = "OIDC issuer without https://, used in the IRSA trust condition."
   type        = string
 }
 
@@ -30,13 +35,13 @@ variable "chart_version" {
 }
 
 variable "namespace" {
-  description = "Namespace where Cilium is installed."
+  description = "Namespace where Cilium is installed (must match the IRSA service account)."
   type        = string
   default     = "kube-system"
 }
 
 variable "operator_service_account_name" {
-  description = "Must match the cilium-iam IRSA service account name."
+  description = "Service account name created by the Cilium chart for the operator. Must match the IRSA trust sub."
   type        = string
   default     = "cilium-operator"
 }

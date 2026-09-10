@@ -9,8 +9,13 @@ The goal of this document is to explain the *whole* install process,
 it means what Terraform does, what Kubernetes does, and what AWS does
 underneath.
 
-Companion module: [`../cilium-iam`](../cilium-iam) (IRSA role the operator
-uses to create ENIs). Wired from [`../../eks-implementation`](../../eks-implementation).
+This module is the **networking complement** for the platform: IRSA for
+ENI IPAM **and** the Cilium Helm install live here, in one module. It is
+not part of the cluster definition (`modules/iam`, `modules/cluster`,
+`modules/nodegroup`). Wired from [`../../../eks-implementation`](../../../eks-implementation).
+
+See [`../../README.md`](../../README.md) for how complements differ from
+the control plane.
 
 ---
 
@@ -67,12 +72,13 @@ over ENIs, pod IPs, and `/etc/cni/net.d/`.
                                 |
          terraform apply  (one graph, no kubeconfig, no pause)
                                 |
-         helm_release.disable_legacy_cni
-           Helm (workstation) ──aws eks get-token──► EKS API
-           Helm hook Job (on a node, hostNetwork)
-             kubectl patch aws-node + kube-proxy  ──► desired=0
-                                |
-         helm_release.cilium  (depends_on the release above)
+         module.cilium  (complements/networking/cilium)
+           iam.tf  IRSA role for ENI IPAM
+           helm_release.disable_legacy_cni
+             Helm (workstation) ──aws eks get-token──► EKS API
+             Helm hook Job (on a node, hostNetwork)
+               kubectl patch aws-node + kube-proxy  ──► desired=0
+           helm_release.cilium  (after the patch Job *and* the IAM role)
            operator + agents + Hubble
                                 |
          operator: secondary ENIs + IPs
@@ -132,22 +138,29 @@ allow prefixes, the operator falls back to classic secondary IPs
 ## 4. Terraform pieces and apply order
 
 Providers stay in the **root** (`eks-implementation/providers.tf`). Child
-modules do not declare their own AWS/Helm providers. This module only
-consumes Helm.
+modules do not declare their own AWS/Helm provider *blocks*; this module
+declares that it needs both (`versions.tf`).
+
+This path is a **complement**, not cluster core:
 
 ```
-module.iam            → cluster + node IAM roles
-module.cluster        → EKS API, KMS, OIDC, subnet cluster tags
-module.nodegroup      → launch template (IMDS hop limit 2) + managed nodes
-module.cilium_iam     → IRSA role <cluster>-cilium-operator
-module.cilium         → 1) helm_release.disable_legacy_cni
-                      → 2) helm_release.cilium   (depends_on 1)
+modules/iam            → cluster + node IAM roles   (cluster definition)
+modules/cluster        → EKS API, KMS, OIDC
+modules/nodegroup      → launch template + managed nodes
+complements/networking/cilium
+                       → 1) iam.tf IRSA for cilium-operator
+                       → 2) helm_release.disable_legacy_cni
+                       → 3) helm_release.cilium
 ```
 
-`module.cilium` itself `depends_on` the node group and `cilium_iam`.
-Until kubelet has registered at least one node, there is nowhere to
-schedule the patch Job. Until the IRSA role exists, the operator cannot
-call EC2.
+`module.cilium` at the root `depends_on` the node group. Until kubelet
+has registered at least one node, there is nowhere to schedule the
+patch Job. Inside the module the graph is:
+
+1. `aws_iam_role.operator` + inline ENI policy (needs OIDC from the cluster).
+2. `helm_release.disable_legacy_cni` (needs a node; does **not** need IRSA).
+3. `helm_release.cilium` waits for **both** the patch release and the
+   IAM policy (`depends_on`). The operator cannot call EC2 without the role.
 
 Two Helm releases, not one, on purpose:
 
@@ -156,10 +169,11 @@ Two Helm releases, not one, on purpose:
 | `disable-legacy-cni` | local, [`charts/disable-legacy-cni`](charts/disable-legacy-cni) | Hook Job succeeded **and** the leftover ConfigMap exists (`wait = true`, `atomic = true`, timeout 300s) |
 | `cilium` | `https://helm.cilium.io/` version `var.chart_version` | Chart ready checks pass (`wait = true`, timeout 900s) |
 
-`helm_release.cilium` has `depends_on = [helm_release.disable_legacy_cni]`.
+`helm_release.cilium` has `depends_on = [helm_release.disable_legacy_cni, aws_iam_role_policy.operator_eni]`.
 Terraform will not even *start* the Cilium install if the patch release
-failed or is still running. That is the sequencing guarantee: one
-`terraform apply --auto-approve`, no pause, no human `kubectl`.
+failed or is still running, or if the operator role is not ready. That
+is the sequencing guarantee: one `terraform apply --auto-approve`, no
+pause, no human `kubectl`.
 
 ### Who talks to the API (and who does not)
 
@@ -188,7 +202,7 @@ The cutover is the official Cilium patch: do **not** delete the
 DaemonSets. Change their `nodeSelector` so they match **zero** nodes.
 
 What the Job runs (equivalent `kubectl` for explanation only — Terraform
-does not execute this on the laptop):
+does not execute this on local):
 
 ```bash
 kubectl -n kube-system patch daemonset aws-node --type=strategic \
@@ -250,54 +264,16 @@ The patch Job itself is hostNetwork and talks to the **FQDN**, so it
 does not take that ClusterIP bullet. It finishes (or has already
 finished) before Cilium starts.
 
-### 5.3 Why this cannot be `local-exec` + laptop `kubectl`
-
-The first *working* workaround was `terraform_data` +
-`scripts/disable-legacy-cni.sh` on the machine that runs Terraform.
-That is the opposite of what this stack is for:
-
-- `terraform apply --auto-approve` is one graph. It cannot stop for
-  `aws eks update-kubeconfig`.
-- `local-exec` uses **whatever kubeconfig is current**. A recreate, a
-  second AWS account, or a CI runner with no `kubectl` patches the
-  wrong cluster — or nothing.
-- Helm already has a correct, refreshable credential to *this* cluster.
-  The patch must use that path, not a side channel.
-
-So the patch is a **Helm release Terraform owns**, same provider, same
-cluster endpoint, same exec authenticator as Cilium.
-
-### 5.4 Second attempt: in-cluster Job (and why Bitnami blew up)
+### 5.3 Using in-cluster Job
 
 An in-cluster Job is the right shape: Kubernetes runs `kubectl patch`
-after nodes exist, Terraform waits, then Cilium installs. The first
-chart used `public.ecr.aws/bitnami/kubectl:1.35.0`. **That tag does not
-exist.** The hook pod sat in `ImagePullBackOff`, Helm waited until
-timeout, Terraform reported:
+after nodes exist, Terraform waits, then Cilium installs.
 
-```
-Helm release "disable-legacy-cni" was created but has a failed status
-failed post-install: timed out waiting for the condition
-```
-
-`aws-node` / `kube-proxy` were never patched. Cilium then installed on
-top of a live VPC CNI — two CNIs fighting over ENIs.
-
-The image that **does** exist, and that AL2023 nodes can pull via NAT
-from `registry.k8s.io`, is:
-
-```
-registry.k8s.io/kubectl:v1.35.0
-```
-
-Pinned as `var.kubectl_image`. It is the official distroless kubectl
-image (multi-arch). Distroless means **no shell**, so the old bash
-`if kubectl get; then patch; fi` script cannot run inside it. The chart
-uses two sequential **initContainers** instead (section 5.6). Default
+The chart uses two sequential **initContainers** (section 5.6). Default
 EKS clusters always create both DaemonSets; a missing object fails the
 Job on purpose rather than silently skipping.
 
-### 5.5 Helm chart layout and hook order
+### 5.4 Helm chart layout and hook order
 
 Chart path: [`charts/disable-legacy-cni`](charts/disable-legacy-cni).
 Terraform sets values with `yamlencode` (no extra template file):
@@ -347,7 +323,7 @@ ConfigMap is a durable, empty-of-logic marker that the cutover chart
 is installed. It records the two selector keys for operators reading
 the cluster.
 
-### 5.6 How the Job is scheduled (it must not need CNI)
+### 5.5 How the Job is scheduled (it must not need CNI)
 
 At this moment in the apply, **VPC CNI is still the CNI**. The Job
 could take a pod IP from `aws-node`. It does **not**, by design:
@@ -368,7 +344,7 @@ The node pulls `registry.k8s.io` through the **private subnet NAT**.
 If NAT is missing, this Job (and later Cilium images) cannot start.
 That is a bootstrap-stack problem, not a Cilium problem.
 
-### 5.7 RBAC: least privilege, named objects
+### 5.6 RBAC: least privilege, named objects
 
 The Role is namespaced to `kube-system` and limited to two names:
 
@@ -384,7 +360,7 @@ verbs: ["get", "patch"]
 `disable-legacy-cni`. All three objects are hooks at weight `-20`, so
 they exist before the Job at `-10`.
 
-### 5.8 Distroless initContainers (the actual PATCH)
+### 5.7 Distroless initContainers (the actual PATCH)
 
 Entry point of the image is `/kubectl`. Kubernetes `args` become kubectl
 arguments. There is no `sh`.
@@ -402,7 +378,7 @@ already finished talking to the API via the FQDN, not via kube-proxy.
 The same PATCH applied twice is a no-op success (idempotent). Re-running
 the hook on upgrade does not flap the DaemonSets.
 
-### 5.9 Timeline of one `terraform apply` (new cluster)
+### 5.8 Timeline of one `terraform apply` (new cluster)
 
 Assume bootstrap VPC is already up. The human runs only:
 
@@ -418,7 +394,9 @@ What happens, in order Terraform can actually wait on:
 2. **Managed node group.** Nodes join. `aws-node` writes
    `/etc/cni/net.d/`. Nodes become Ready. CoreDNS may go Running
    briefly on VPC CNI IPs — that is expected and temporary.
-3. **`cilium_iam`.** IRSA role for the operator. No pods yet.
+3. **`module.cilium` (`complements/networking/cilium`).** IAM role and
+   patch Job can proceed in the same module. The Job does not need IRSA;
+   the Cilium Helm release needs both.
 4. **`helm_release.disable_legacy_cni`.**
    - Helm (workstation) calls the EKS API with a fresh `get-token`.
    - Hook weight `-20`: SA / Role / RoleBinding.
@@ -430,8 +408,9 @@ What happens, in order Terraform can actually wait on:
      the Job (`hook-succeeded`).
    - ConfigMap is created. Helm `wait` returns. Terraform marks this
      resource created.
-5. **`helm_release.cilium`** starts only now (`depends_on`).
-   node-init, operator, agents, Hubble. See section 6.
+5. **`helm_release.cilium`** starts only now (`depends_on` the Job **and**
+   the operator IAM policy). node-init, operator, agents, Hubble. See
+   section 6.
 6. Operator attaches secondary ENIs. Agents become Ready. CoreDNS and
    Hubble get Cilium IPs.
 
@@ -439,7 +418,7 @@ Failure in step 4 (`ImagePullBackOff`, RBAC, missing DaemonSet, timeout)
 fails the Helm release, `atomic` rolls it back, and step 5 never runs.
 You do not get a hybrid CNI.
 
-### 5.10 Later applies (idempotency)
+### 5.9 Later applies (idempotency)
 
 - **No chart/image change:** Helm sees the release, no upgrade, hook
   does not run. DaemonSets stay parked. Cilium is unchanged.
@@ -489,7 +468,7 @@ the operator’s CIDR pool. Always confirm with `kubectl` (section 11).
 
 ### 7.1 Identity (IRSA)
 
-[`../cilium-iam`](../cilium-iam) creates
+[`iam.tf`](iam.tf) in this module creates
 `arn:aws:iam::<account>:role/<cluster>-cilium-operator`.
 
 Trust: only the OIDC provider of *this* cluster, only
@@ -641,7 +620,7 @@ correct resolver for AWS API hostnames anyway.
 ## 10. How this depends on the VPC (bootstrap stack)
 
 ENI mode is only as correct as the subnet plan in
-`bootstrap-infrastructure/locals.tf`:
+[`../../../bootstrap-infrastructure/locals.tf`](../../../bootstrap-infrastructure/locals.tf):
 
 | Subnet | Tag Cilium cares about | Used for |
 |---|---|---|
@@ -711,11 +690,9 @@ Expected order on a clean account/VPC (bootstrap already applied):
 1. IAM roles for cluster + nodes.
 2. EKS control plane + OIDC.
 3. Nodes join with stock `aws-node` + `kube-proxy` (minutes).
-4. IRSA role for the operator.
-5. Helm `disable-legacy-cni` (section 5.9): hook Job on a node PATCHes
-   both DaemonSets; Terraform waits; Cilium has not started yet.
-6. Helm Cilium → node-init, operator, agents.
-7. Operator attaches ENIs; agents become 1/1; CoreDNS/Hubble start.
+4. **`module.cilium`**: IRSA in `iam.tf`, then Helm `disable-legacy-cni`
+   (section 5.9), then Helm Cilium. One module, still sequential inside.
+5. Operator attaches ENIs; agents become 1/1; CoreDNS/Hubble start.
 
 The only credentials on the machine running apply are AWS credentials
 with permission to call `eks:GetToken` (and to manage the rest of the
@@ -754,7 +731,9 @@ These existed as real failures, not style choices:
 
 ## 14. What this module does not do
 
-- It does not manage the VPC, cluster, or node group (other modules).
+- It does not manage the VPC, cluster, or node group. Those stay in
+  `modules/` (cluster definition). This module is the networking
+  complement: operator IRSA + Cilium only.
 - It does not uninstall EKS default add-on *objects*; it parks them with
   a nodeSelector.
 - It does not install the AWS Load Balancer Controller, cluster

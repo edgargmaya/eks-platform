@@ -3,8 +3,8 @@ data "aws_region" "current" {}
 
 data "aws_iam_policy_document" "assume_role" {
   statement {
-    sid     = "AllowCiliumOperatorIRSA"
-    effect  = "Allow"
+    sid    = "AllowCiliumOperatorIRSA"
+    effect = "Allow"
     actions = [
       "sts:AssumeRoleWithWebIdentity",
       "sts:TagSession",
@@ -18,7 +18,7 @@ data "aws_iam_policy_document" "assume_role" {
     condition {
       test     = "StringEquals"
       variable = "${var.oidc_provider_hostpath}:sub"
-      values   = ["system:serviceaccount:${var.namespace}:${var.service_account_name}"]
+      values   = ["system:serviceaccount:${var.namespace}:${var.operator_service_account_name}"]
     }
 
     condition {

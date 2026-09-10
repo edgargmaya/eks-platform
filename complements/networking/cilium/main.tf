@@ -46,12 +46,15 @@ resource "helm_release" "cilium" {
       enable_prefix_delegation      = var.enable_prefix_delegation
       k8s_service_host              = local.k8s_service_host
       operator_service_account_name = var.operator_service_account_name
-      operator_role_arn             = var.operator_role_arn
+      operator_role_arn             = aws_iam_role.operator.arn
       enable_hubble                 = var.enable_hubble
       enable_hubble_ui              = var.enable_hubble_ui
       aws_region                    = var.aws_region
     })
   ]
 
-  depends_on = [helm_release.disable_legacy_cni]
+  depends_on = [
+    helm_release.disable_legacy_cni,
+    aws_iam_role_policy.operator_eni,
+  ]
 }

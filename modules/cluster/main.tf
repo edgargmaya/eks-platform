@@ -137,20 +137,6 @@ resource "aws_eks_cluster" "this" {
   depends_on = [aws_cloudwatch_log_group.cluster]
 }
 
-data "tls_certificate" "cluster" {
-  url = aws_eks_cluster.this.identity[0].oidc[0].issuer
-}
-
-resource "aws_iam_openid_connect_provider" "cluster" {
-  client_id_list  = ["sts.${data.aws_partition.current.dns_suffix}"]
-  thumbprint_list = [data.tls_certificate.cluster.certificates[0].sha1_fingerprint]
-  url             = aws_eks_cluster.this.identity[0].oidc[0].issuer
-
-  tags = {
-    Name = "${var.cluster_name}-irsa"
-  }
-}
-
 resource "aws_ec2_tag" "public_cluster" {
   for_each = var.public_subnet_ids
 
