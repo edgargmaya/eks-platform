@@ -108,6 +108,16 @@ output "lbc_status" {
   value       = module.lbc.status
 }
 
+output "metrics_server_chart_version" {
+  description = "Installed metrics-server Helm chart version."
+  value       = module.metrics_server.chart_version
+}
+
+output "metrics_server_status" {
+  description = "metrics-server Helm release status."
+  value       = module.metrics_server.status
+}
+
 output "keda_operator_role_arn" {
   description = "IAM role ARN for keda-operator (IRSA)."
   value       = module.keda.operator_role_arn

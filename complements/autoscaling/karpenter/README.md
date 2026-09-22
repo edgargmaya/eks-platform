@@ -6,8 +6,9 @@ IRSA enablement already exists in
 [`../../../modules/cluster/irsa.tf`](../../../modules/cluster/irsa.tf).
 
 The **managed node group stays**. It is the system pool (Cilium, LBC,
-KEDA, this controller). Karpenter launches **additional** EC2 instances
-for unschedulable workloads. It does not scale the managed node group ASG.
+metrics-server, KEDA, this controller). Karpenter launches **additional**
+EC2 instances for unschedulable workloads. It does not scale the managed
+node group ASG.
 
 Wired from [`../../../eks-implementation`](../../../eks-implementation)
 **after** Cilium.

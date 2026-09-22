@@ -24,7 +24,8 @@ by area:
 | Networking        | `[networking/cilium](networking/cilium)`     | Replace VPC CNI + kube-proxy; ENI IPAM IRSA       |
 | Storage           | `[storage/ebs](storage/ebs)`                 | EBS CSI managed add-on, IRSA, default gp3          |
 | Load balancing    | `[loadbalancing/lbc](loadbalancing/lbc)`   | AWS Load Balancer Controller Helm + IRSA          |
-| Pod autoscaling   | `[autoscaling/keda](autoscaling/keda)`       | KEDA Helm + IRSA (operator)                        |
+| Resource metrics  | `[autoscaling/metrics-server](autoscaling/metrics-server)` | metrics-server Helm (`metrics.k8s.io` for HPA / KEDA CPU-RAM) |
+| Pod autoscaling   | `[autoscaling/keda](autoscaling/keda)`       | KEDA Helm + IRSA (operator); CPU/RAM needs metrics-server |
 | Cluster scale     | `[autoscaling/karpenter](autoscaling/karpenter)` | Karpenter Helm + IRSA; managed NG stays as system pool |
 | Secrets           | —                                            | Later (External Secrets Operator)                 |
 
@@ -34,6 +35,8 @@ when that responsibility is implemented, not before.
 
 Root wiring: `[../eks-implementation](../eks-implementation)`. Providers
 stay there. Networking complements sequence after nodes. Storage,
-load balancing, pod autoscaling, and Karpenter sequence after Cilium
-(controller pods need CNI). The managed node group remains the system
-pool; Karpenter adds workload nodes.
+load balancing, metrics-server, pod autoscaling, and Karpenter sequence
+after Cilium (controller pods need CNI). metrics-server is applied
+**before** KEDA so CPU/memory ScaledObjects have `metrics.k8s.io`.
+The managed node group remains the system pool; Karpenter adds
+workload nodes.

@@ -12,8 +12,9 @@ This module only declares **this add-on’s** IAM and install:
    ServiceAccount (`eks.amazonaws.com/role-arn`).
 
 Wired from [`../../../eks-implementation`](../../../eks-implementation)
-**after** Cilium (`depends_on = [module.cilium]`): operator, metrics
-API, and webhook pods need a working CNI.
+**after** Cilium and **metrics-server**. Operator, KEDA metrics API, and
+webhook pods need a working CNI. CPU/memory ScaledObjects also need
+[`../metrics-server`](../metrics-server) (`metrics.k8s.io`).
 
 See [`../../README.md`](../../README.md) for how complements differ from
 the control plane.
@@ -64,6 +65,7 @@ upgrade.
 ```
 modules/cluster/irsa.tf               IAM OIDC provider (cluster-wide IRSA)
 complements/networking/cilium         CNI must be Ready
+complements/autoscaling/metrics-server  metrics.k8s.io (CPU/memory HPA)
 complements/autoscaling/keda
     iam.tf                         IRSA role (+ optional scaler policy)
     helm_release.this              chart + IRSA annotations
@@ -79,7 +81,7 @@ module "keda" {
   oidc_provider_arn      = module.cluster.oidc_provider_arn
   oidc_provider_hostpath = module.cluster.oidc_provider_hostpath
 
-  depends_on = [module.cilium]
+  depends_on = [module.cilium, module.metrics_server]
 }
 ```
 
@@ -120,8 +122,9 @@ Assume bootstrap + cluster definition + Cilium already succeeded.
 2. **Helm** creates namespace `keda`, CRDs, operator, metrics API,
    webhooks. Terraform waits until the release is ready.
 
-`metrics-server` is **not** this module. CPU/memory triggers need it;
-cron / SQS / Prometheus do not.
+`metrics-server` is the sibling
+[`../metrics-server`](../metrics-server) complement, applied **before**
+this module. CPU/memory triggers need it; cron / SQS / Prometheus do not.
 
 ---
 
@@ -187,7 +190,8 @@ done.
 
 - Register the cluster OIDC issuer (`modules/cluster/irsa.tf`).
 - Cluster autoscaling (Karpenter / Cluster Autoscaler).
-- `metrics-server` (EKS community add-on; needed only for CPU/memory
+- `metrics-server` (sibling complement
+  [`../metrics-server`](../metrics-server); needed only for CPU/memory
   scalers).
 - AWS scaler IAM (SQS, CloudWatch, …) until you pass
   `operator_iam_policy_json`.

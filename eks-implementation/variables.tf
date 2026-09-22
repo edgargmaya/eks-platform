@@ -88,6 +88,12 @@ variable "lbc_chart_version" {
   default     = "3.5.0"
 }
 
+variable "metrics_server_chart_version" {
+  description = "metrics-server Helm chart version (kubernetes-sigs/metrics-server)."
+  type        = string
+  default     = "3.14.0"
+}
+
 variable "keda_chart_version" {
   description = "KEDA Helm chart version (kedacore/charts)."
   type        = string

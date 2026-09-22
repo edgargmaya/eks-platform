@@ -77,6 +77,14 @@ module "lbc" {
   depends_on = [module.cilium]
 }
 
+module "metrics_server" {
+  source = "../complements/autoscaling/metrics-server"
+
+  chart_version = var.metrics_server_chart_version
+
+  depends_on = [module.cilium]
+}
+
 module "keda" {
   source = "../complements/autoscaling/keda"
 
@@ -85,7 +93,7 @@ module "keda" {
   oidc_provider_hostpath = module.cluster.oidc_provider_hostpath
   chart_version          = var.keda_chart_version
 
-  depends_on = [module.cilium]
+  depends_on = [module.cilium, module.lbc, module.metrics_server]
 }
 
 module "karpenter" {
@@ -100,7 +108,7 @@ module "karpenter" {
   node_role_arn             = module.iam.node_role_arn
   chart_version             = var.karpenter_chart_version
 
-  depends_on = [module.cilium]
+  depends_on = [module.cilium, module.lbc, module.keda]
 }
 
 # Preserve state after merging modules/cilium-iam into this complement.
