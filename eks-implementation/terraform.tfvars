@@ -11,8 +11,8 @@ tfstate_kms_alias       = "eks-platform-alesia-tfstate"
 endpoint_public_access_cidrs = ["0.0.0.0/0"]
 
 node_instance_types = ["t3.medium"]
-node_desired_size   = 2
-node_min_size       = 2
+node_desired_size   = 3
+node_min_size       = 3
 node_max_size       = 6
 
 cilium_chart_version    = "1.20.1"

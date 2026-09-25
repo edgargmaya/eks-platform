@@ -106,6 +106,12 @@ variable "karpenter_chart_version" {
   default     = "1.14.1"
 }
 
+variable "argocd_chart_version" {
+  description = "Argo CD Helm chart version (argo-helm argo-cd)."
+  type        = string
+  default     = "10.9.2"
+}
+
 variable "tags" {
   description = "Tags merged into the provider default_tags."
   type        = map(string)

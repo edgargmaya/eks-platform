@@ -152,3 +152,18 @@ output "karpenter_interruption_queue_name" {
   description = "SQS queue for Karpenter interruption handling."
   value       = module.karpenter.interruption_queue_name
 }
+
+output "argocd_chart_version" {
+  description = "Installed Argo CD Helm chart version."
+  value       = module.argocd.chart_version
+}
+
+output "argocd_status" {
+  description = "Argo CD Helm release status."
+  value       = module.argocd.status
+}
+
+output "argocd_namespace" {
+  description = "Namespace where Argo CD is installed."
+  value       = module.argocd.namespace
+}

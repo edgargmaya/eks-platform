@@ -40,3 +40,6 @@ after Cilium (controller pods need CNI). metrics-server is applied
 **before** KEDA so CPU/memory ScaledObjects have `metrics.k8s.io`.
 The managed node group remains the system pool; Karpenter adds
 workload nodes.
+
+GitOps applications are not complements. Argo CD lives in
+[`../infrastructure-applications`](../infrastructure-applications).

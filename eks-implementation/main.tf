@@ -111,6 +111,20 @@ module "karpenter" {
   depends_on = [module.cilium, module.lbc, module.keda]
 }
 
+module "argocd" {
+  source = "../infrastructure-applications/argocd"
+
+  chart_version = var.argocd_chart_version
+
+  # Platform pods already fill the t3.medium ENI address space. Leave Argo CD
+  # unschedulable on that pool so Karpenter can launch a workload node.
+  node_selector = {
+    "karpenter.sh/nodepool" = "default"
+  }
+
+  depends_on = [module.cilium, module.lbc, module.karpenter]
+}
+
 # Preserve state after merging modules/cilium-iam into this complement.
 moved {
   from = module.cilium_iam.aws_iam_role.operator
