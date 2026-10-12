@@ -167,3 +167,38 @@ output "argocd_namespace" {
   description = "Namespace where Argo CD is installed."
   value       = module.argocd.namespace
 }
+
+output "vault_chart_version" {
+  description = "Installed Vault Helm chart version."
+  value       = module.vault.chart_version
+}
+
+output "vault_status" {
+  description = "Vault Helm release status. Pods stay unready until operator init."
+  value       = module.vault.status
+}
+
+output "vault_namespace" {
+  description = "Namespace where Vault is installed."
+  value       = module.vault.namespace
+}
+
+output "vault_unseal_key_arn" {
+  description = "KMS key ARN for Vault auto-unseal."
+  value       = module.vault.unseal_key_arn
+}
+
+output "vault_server_role_arn" {
+  description = "IAM role ARN for the Vault ServiceAccount (IRSA)."
+  value       = module.vault.server_role_arn
+}
+
+output "external_secrets_chart_version" {
+  description = "Installed External Secrets Operator Helm chart version."
+  value       = module.external_secrets.chart_version
+}
+
+output "external_secrets_status" {
+  description = "External Secrets Operator Helm release status."
+  value       = module.external_secrets.status
+}

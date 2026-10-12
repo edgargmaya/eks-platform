@@ -112,6 +112,18 @@ variable "argocd_chart_version" {
   default     = "10.9.2"
 }
 
+variable "vault_chart_version" {
+  description = "Vault Helm chart version (hashicorp/vault)."
+  type        = string
+  default     = "0.34.1"
+}
+
+variable "external_secrets_chart_version" {
+  description = "External Secrets Operator Helm chart version."
+  type        = string
+  default     = "2.11.0"
+}
+
 variable "tags" {
   description = "Tags merged into the provider default_tags."
   type        = map(string)

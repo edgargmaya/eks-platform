@@ -125,6 +125,26 @@ module "argocd" {
   depends_on = [module.cilium, module.lbc, module.karpenter]
 }
 
+module "vault" {
+  source = "../infrastructure-applications/vault"
+
+  cluster_name           = module.cluster.cluster_name
+  aws_region             = var.aws_region
+  oidc_provider_arn      = module.cluster.oidc_provider_arn
+  oidc_provider_hostpath = module.cluster.oidc_provider_hostpath
+  chart_version          = var.vault_chart_version
+
+  depends_on = [module.cilium, module.ebs, module.karpenter]
+}
+
+module "external_secrets" {
+  source = "../complements/secrets/external-secrets"
+
+  chart_version = var.external_secrets_chart_version
+
+  depends_on = [module.cilium]
+}
+
 # Preserve state after merging modules/cilium-iam into this complement.
 moved {
   from = module.cilium_iam.aws_iam_role.operator

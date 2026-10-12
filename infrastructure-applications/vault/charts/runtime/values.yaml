@@ -1,0 +1,4 @@
+nodePoolName: vault
+nodeClassName: default
+storageClassName: vault-gp3
+cpuLimit: 8

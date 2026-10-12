@@ -27,7 +27,7 @@ by area:
 | Resource metrics  | `[autoscaling/metrics-server](autoscaling/metrics-server)` | metrics-server Helm (`metrics.k8s.io` for HPA / KEDA CPU-RAM) |
 | Pod autoscaling   | `[autoscaling/keda](autoscaling/keda)`       | KEDA Helm + IRSA (operator); CPU/RAM needs metrics-server |
 | Cluster scale     | `[autoscaling/karpenter](autoscaling/karpenter)` | Karpenter Helm + IRSA; managed NG stays as system pool |
-| Secrets           | —                                            | Later (External Secrets Operator)                 |
+| Secrets           | `[secrets/external-secrets](secrets/external-secrets)` | External Secrets Operator. Provider-neutral interface; Vault is not installed here |
 
 
 Empty folders for the later rows are intentional omissions. Add a module

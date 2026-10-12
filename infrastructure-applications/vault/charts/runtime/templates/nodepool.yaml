@@ -1,0 +1,45 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ .Values.nodePoolName }}
+spec:
+  template:
+    spec:
+      # Vault does not share the system pool or the general workload pool.
+      taints:
+        - key: dedicated
+          value: vault
+          effect: NoSchedule
+      expireAfter: Never
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: {{ .Values.nodeClassName }}
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m"]
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["2"]
+        - key: karpenter.k8s.aws/instance-hypervisor
+          operator: In
+          values: ["nitro"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+  limits:
+    cpu: {{ .Values.cpuLimit | quote }}
+  disruption:
+    # Do not bin-pack Vault away. Remove a node only after its pod is gone.
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 5m
